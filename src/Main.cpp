@@ -20,7 +20,12 @@ json decode_bencoded_value(const std::string& encoded_value) {
         } else {
             throw std::runtime_error("Invalid encoded value: " + encoded_value);
         }
-    } else {
+    } 
+    else if (encoded_value[0] == 'i' && encoded_value[encoded_value.size()-1] == 'e'){
+        std::string x = encoded_value.substr(1, encoded_value.size()-2);
+        return json(std::atoll(x.c_str()));
+    }
+    else {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
 }
@@ -46,6 +51,7 @@ int main(int argc, char* argv[]) {
         // std::cout << "Logs from your program will appear here!" << std::endl;
 
         // Uncomment this block to pass the first stage
+
         std::string encoded_value = argv[2]; // this is the change
         json decoded_value = decode_bencoded_value(encoded_value);
         std::cout << decoded_value.dump() << std::endl;
