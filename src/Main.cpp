@@ -1,95 +1,113 @@
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <tuple>
 #include "lib/nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
-std::tuple<json, std::string> decode_bencoded_value(const std::string &encoded_value)
-{
-    if (std::isdigit(encoded_value[0]))
-    {
+json decode_bencoded_value(std::string& encoded_value) {
+    if (std::isdigit(encoded_value[0])) {
         // Example: "5:hello" -> "hello"
         size_t colon_index = encoded_value.find(':');
-        if (colon_index != std::string::npos)
-        {
+        if (colon_index != std::string::npos) {
             std::string number_string = encoded_value.substr(0, colon_index);
-            // int64_t number = std::atoll(number_string.c_str()); // atoll is used to convert string to long long
-            int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
+            int64_t number = std::atoll(number_string.c_str());
             std::string str = encoded_value.substr(colon_index + 1, number);
-            return std::make_tuple(json(str), encoded_value.substr(colon_index + 1 + number));
-        }
-        else
-        {
+            encoded_value = encoded_value.substr(colon_index+1+number, std::string::npos);
+            return json(str);
+        } else {
             throw std::runtime_error("Invalid encoded value: " + encoded_value);
         }
-    }
-    else if (encoded_value[0] == 'i')
-    {
-        // Example: "i42e" -> 42
-        size_t e_index = encoded_value.find('e');
-        if (e_index == std::string::npos)
-        {
+    } else if (encoded_value[0] == 'i') {
+        size_t end_index = encoded_value.find('e');
+        if (end_index != std::string::npos) {
+            std::string number_string = encoded_value.substr(1, end_index);
+            int64_t number = std::atoll(number_string.c_str());
+            encoded_value = encoded_value.substr(end_index+1, std::string::npos);
+            return json(number);
+        } else {
             throw std::runtime_error("Invalid encoded value: " + encoded_value);
         }
-        std::string number_string = encoded_value.substr(1, e_index - 1);
-        int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
-        return std::make_tuple(json(number), encoded_value.substr(e_index + 1));
-    }
-    else if (encoded_value[0] == 'l')
-    {
-        // Example: "l5:helloe" -> ["hello"]
+    } else if (encoded_value[0] == 'l') {
         json list = json::array();
-        // remove the 'l' from the beginning
-        std::string rest = encoded_value.substr(1);
-        while (rest[0] != 'e')
-        {
-            json value;
-            std::tie(value, rest) = decode_bencoded_value(rest);
-            list.push_back(value);
+        encoded_value = encoded_value.substr(1, std::string::npos);
+        while (true) {
+            if (encoded_value[0] == 'e') break;
+            json res = decode_bencoded_value(encoded_value);
+            list.push_back(res);
         }
-        return std::make_tuple(list, rest.substr(1));
-    }
-    else if (encoded_value[0] == 'd')
-    {
-        // Example: "d3:cow3:moo4:spam4:eggse" -> {"cow": "moo", "spam": "eggs"}
+        encoded_value = encoded_value.substr(1, std::string::npos);
+        return list;
+    } else if (encoded_value[0] == 'd') {
         json dict = json::object();
-        std::string rest = encoded_value.substr(1);
-        while (rest[0] != 'e')
-        {
-            json key, value;
-            std::tie(key, rest) = decode_bencoded_value(rest);
-            std::tie(value, rest) = decode_bencoded_value(rest);
-            dict[key.get<std::string>()] = value;
+        encoded_value = encoded_value.substr(1, std::string::npos);
+        while (true) {
+            if (encoded_value[0] == 'e') break;
+            json key = decode_bencoded_value(encoded_value);
+            if (not key.is_string()) {
+                throw std::runtime_error("Invalid encoded value: " + encoded_value);
+            }
+            json val = decode_bencoded_value(encoded_value);
+            dict[key] = val;
         }
-        return std::make_tuple(dict, rest.substr(1));
-    }
-    else
-    {
+        encoded_value = encoded_value.substr(1, std::string::npos);
+        return dict;
+    } else {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
 }
 
+json parse_torrent_file(const std::string &filename)
+{
+    std::ifstream ifs(filename);
+    if (ifs)
+    {
+        ifs.seekg(0, ifs.end);
+        int length = ifs.tellg();
+        ifs.seekg(0, ifs.beg);
+        char *buffer = new char[length];
+        ifs.read(buffer, length);
+        std::string torrent_data = buffer;
+        return decode_bencoded_value(torrent_data);
+    }
+    throw std::runtime_error("Unable to find file: " + filename);
+}
+
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
+    if (argc < 2)
+    {
         std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
         return 1;
     }
     std::string command = argv[1];
-    if (command == "decode") {
-        if (argc < 3) {
+    if (command == "decode")
+    {
+        if (argc < 3)
+        {
             std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
             return 1;
         }
         std::string encoded_value = argv[2];
         json decoded_value;
         std::tie(decoded_value, std::ignore) = decode_bencoded_value(encoded_value);
-//        json decoded_value = decode_bencoded_value(encoded_value);
+        //        json decoded_value = decode_bencoded_value(encoded_value);
         std::cout << decoded_value.dump() << std::endl;
-    } else {
+    }
+    else if (command == "info")
+    {
+        std::string filename = argv[2];
+        json decoded_data = parse_torrent_file(filename);
+        std::string tracker_url;
+        decoded_data["announce"].get_to(tracker_url);
+        std::cout << "Tracker URL: " << tracker_url << std::endl;
+        std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
+    }
+    else
+    {
         std::cerr << "unknown command: " << command << std::endl;
         return 1;
     }
