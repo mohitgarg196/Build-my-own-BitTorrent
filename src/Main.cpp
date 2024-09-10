@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include "lib/nlohmann/json.hpp"
-#include "lib/sha1.hpp"
+#include "lib/nlohmann/sha1.hpp"
 
 using json = nlohmann::json;
 json decode_integer(const std::string &encoded_value, size_t &index);
