@@ -4,52 +4,70 @@
 #include <string>
 #include <tuple>
 #include "lib/nlohmann/json.hpp"
+
 using json = nlohmann::json;
-std::tuple<json, std::string> decode_bencoded_value(const std::string &encoded_value) {
-    if (std::isdigit(encoded_value[0])) {
+
+std::tuple<json, std::string> decode_bencoded_value(const std::string &encoded_value)
+{
+    if (std::isdigit(encoded_value[0]))
+    {
         // Example: "5:hello" -> "hello"
         size_t colon_index = encoded_value.find(':');
-        if (colon_index != std::string::npos) {
+        if (colon_index != std::string::npos)
+        {
             std::string number_string = encoded_value.substr(0, colon_index);
-//            int64_t number = std::atoll(number_string.c_str()); // atoll is used to convert string to long long
+            // int64_t number = std::atoll(number_string.c_str()); // atoll is used to convert string to long long
             int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
             std::string str = encoded_value.substr(colon_index + 1, number);
             return std::make_tuple(json(str), encoded_value.substr(colon_index + 1 + number));
-        } else {
+        }
+        else
+        {
             throw std::runtime_error("Invalid encoded value: " + encoded_value);
         }
-    } else if (encoded_value[0] == 'i') {
+    }
+    else if (encoded_value[0] == 'i')
+    {
         // Example: "i42e" -> 42
         size_t e_index = encoded_value.find('e');
-        if (e_index == std::string::npos) {
+        if (e_index == std::string::npos)
+        {
             throw std::runtime_error("Invalid encoded value: " + encoded_value);
         }
         std::string number_string = encoded_value.substr(1, e_index - 1);
         int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
         return std::make_tuple(json(number), encoded_value.substr(e_index + 1));
-    } else if (encoded_value[0] == 'l') {
+    }
+    else if (encoded_value[0] == 'l')
+    {
         // Example: "l5:helloe" -> ["hello"]
         json list = json::array();
         // remove the 'l' from the beginning
         std::string rest = encoded_value.substr(1);
-        while (rest[0] != 'e') {
+        while (rest[0] != 'e')
+        {
             json value;
             std::tie(value, rest) = decode_bencoded_value(rest);
             list.push_back(value);
         }
         return std::make_tuple(list, rest.substr(1));
-    } else if (encoded_value[0] == 'd') {
+    }
+    else if (encoded_value[0] == 'd')
+    {
         // Example: "d3:cow3:moo4:spam4:eggse" -> {"cow": "moo", "spam": "eggs"}
         json dict = json::object();
         std::string rest = encoded_value.substr(1);
-        while (rest[0] != 'e') {
+        while (rest[0] != 'e')
+        {
             json key, value;
             std::tie(key, rest) = decode_bencoded_value(rest);
             std::tie(value, rest) = decode_bencoded_value(rest);
             dict[key.get<std::string>()] = value;
         }
         return std::make_tuple(dict, rest.substr(1));
-    } else {
+    }
+    else
+    {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
 }
