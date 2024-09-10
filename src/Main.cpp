@@ -1,83 +1,57 @@
-#include <iostream>
-#include <string>
-#include <vector>
 #include <cctype>
 #include <cstdlib>
-
+#include <iostream>
+#include <string>
+#include <tuple>
 #include "lib/nlohmann/json.hpp"
-
 using json = nlohmann::json;
-
-// Forward declarations
-json decode_bencoded_value(const std::string &encoded_value, size_t &position);
-
-json decode_bencoded_string(const std::string &encoded_string, size_t &position)
-{
-    // Example: "5:hello" -> "hello"
-    size_t length_prefix = encoded_string.find(':', position);
-    if (length_prefix != std::string::npos)
-    {
-        std::string string_size_str = encoded_string.substr(position, length_prefix - position);
-        int64_t string_size_int = std::atoll(string_size_str.c_str());
-        position = length_prefix + 1 + string_size_int; // Update position
-        std::string str = encoded_string.substr(length_prefix + 1, string_size_int);
-        return json(str);
-    }
-    else
-    {
-        throw std::runtime_error("Invalid encoded value: " + encoded_string);
-    }
-}
-
-json decode_bencoded_integer(const std::string &encoded_value, size_t &position)
-{
-    position++; // Skip 'i'
-    size_t end = encoded_value.find('e', position);
-    if (end == std::string::npos)
-    {
-        throw std::invalid_argument("Invalid bencoded integer");
-    }
-    std::string integer_str = encoded_value.substr(position, end - position);
-    position = end + 1; // Move past 'e'
-    return std::stoll(integer_str);
-}
-
-json decode_bencoded_list(const std::string &encoded_value, size_t &position)
-{
-    position++; // Skip 'l'
-    json list = json::array();
-    while (encoded_value[position] != 'e')
-    {
-        list.push_back(decode_bencoded_value(encoded_value, position));
-    }
-    position++; // Skip 'e'
-    return list;
-}
-
-json decode_bencoded_value(const std::string &encoded_value, size_t &position)
-{
-    if (std::isdigit(encoded_value[position]))
-    {
-        return decode_bencoded_string(encoded_value, position);
-    }
-    else if (encoded_value[position] == 'i')
-    {
-        return decode_bencoded_integer(encoded_value, position);
-    }
-    else if (encoded_value[position] == 'l')
-    {
-        return decode_bencoded_list(encoded_value, position);
-    }
-    else
-    {
+std::tuple<json, std::string> decode_bencoded_value(const std::string &encoded_value) {
+    if (std::isdigit(encoded_value[0])) {
+        // Example: "5:hello" -> "hello"
+        size_t colon_index = encoded_value.find(':');
+        if (colon_index != std::string::npos) {
+            std::string number_string = encoded_value.substr(0, colon_index);
+//            int64_t number = std::atoll(number_string.c_str()); // atoll is used to convert string to long long
+            int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
+            std::string str = encoded_value.substr(colon_index + 1, number);
+            return std::make_tuple(json(str), encoded_value.substr(colon_index + 1 + number));
+        } else {
+            throw std::runtime_error("Invalid encoded value: " + encoded_value);
+        }
+    } else if (encoded_value[0] == 'i') {
+        // Example: "i42e" -> 42
+        size_t e_index = encoded_value.find('e');
+        if (e_index == std::string::npos) {
+            throw std::runtime_error("Invalid encoded value: " + encoded_value);
+        }
+        std::string number_string = encoded_value.substr(1, e_index - 1);
+        int64_t number = std::strtoll(number_string.c_str(), nullptr, 10);
+        return std::make_tuple(json(number), encoded_value.substr(e_index + 1));
+    } else if (encoded_value[0] == 'l') {
+        // Example: "l5:helloe" -> ["hello"]
+        json list = json::array();
+        // remove the 'l' from the beginning
+        std::string rest = encoded_value.substr(1);
+        while (rest[0] != 'e') {
+            json value;
+            std::tie(value, rest) = decode_bencoded_value(rest);
+            list.push_back(value);
+        }
+        return std::make_tuple(list, rest.substr(1));
+    } else if (encoded_value[0] == 'd') {
+        // Example: "d3:cow3:moo4:spam4:eggse" -> {"cow": "moo", "spam": "eggs"}
+        json dict = json::object();
+        std::string rest = encoded_value.substr(1);
+        while (rest[0] != 'e') {
+            json key, value;
+            std::tie(key, rest) = decode_bencoded_value(rest);
+            std::tie(value, rest) = decode_bencoded_value(rest);
+            dict[key.get<std::string>()] = value;
+        }
+        return std::make_tuple(dict, rest.substr(1));
+    } else {
         throw std::runtime_error("Unhandled encoded value: " + encoded_value);
     }
-}
-
-json decode_bencoded_value(const std::string &encoded_value)
-{
-    size_t position = 0;
-    return decode_bencoded_value(encoded_value, position);
 }
 
 int main(int argc, char *argv[])
