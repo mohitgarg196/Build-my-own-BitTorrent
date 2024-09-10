@@ -77,38 +77,30 @@ json parse_torrent_file(const std::string &filename)
     throw std::runtime_error("Unable to find file: " + filename);
 }
 
-int main(int argc, char *argv[])
-{
-    if (argc < 2)
-    {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
         return 1;
     }
     std::string command = argv[1];
-    if (command == "decode")
-    {
-        if (argc < 3)
-        {
+    if (command == "decode") {
+        if (argc < 3) {
             std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
             return 1;
         }
+        // You can use print statements as follows for debugging, they'll be visible when running tests.
+        // std::cout << "Logs from your program will appear here!" << std::endl;
         std::string encoded_value = argv[2];
-        json decoded_value;
-        std::tie(decoded_value, std::ignore) = decode_bencoded_value(encoded_value);
-        //        json decoded_value = decode_bencoded_value(encoded_value);
+        json decoded_value = decode_bencoded_value(encoded_value);
         std::cout << decoded_value.dump() << std::endl;
-    }
-    else if (command == "info")
-    {
+    } else if (command == "info") {
         std::string filename = argv[2];
         json decoded_data = parse_torrent_file(filename);
         std::string tracker_url;
         decoded_data["announce"].get_to(tracker_url);
         std::cout << "Tracker URL: " << tracker_url << std::endl;
         std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
-    }
-    else
-    {
+    } else {
         std::cerr << "unknown command: " << command << std::endl;
         return 1;
     }
