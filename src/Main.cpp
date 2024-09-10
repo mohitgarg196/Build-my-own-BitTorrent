@@ -8,56 +8,96 @@
 
 using json = nlohmann::json;
 
-std::pair<std::string, std::string> extract_string(const std::string& data) {
-    size_t colon_index = data.find(':');
-    if (colon_index == std::string::npos) {
-        throw std::runtime_error("Invalid bencoded value: " + data);
+// Forward declarations
+json decode_bencoded_value(const std::string &encoded_value, size_t &position);
+
+json decode_bencoded_string(const std::string &encoded_string, size_t &position)
+{
+    // Example: "5:hello" -> "hello"
+    size_t length_prefix = encoded_string.find(':', position);
+    if (length_prefix != std::string::npos)
+    {
+        std::string string_size_str = encoded_string.substr(position, length_prefix - position);
+        int64_t string_size_int = std::atoll(string_size_str.c_str());
+        position = length_prefix + 1 + string_size_int; // Update position
+        std::string str = encoded_string.substr(length_prefix + 1, string_size_int);
+        return json(str);
     }
-
-    int64_t length = std::atoll(data.substr(0, colon_index).c_str());
-    std::string extracted_str = data.substr(colon_index + 1, length);
-    std::string remaining_data = data.substr(colon_index + 1 + length);
-
-    return {extracted_str, remaining_data};  // Return the extracted string and remaining data
-}
-
-// Decode function that handles strings and integers from bencoded data
-std::pair<json, std::string> decode(const std::string& data) {
-    if (std::isdigit(data[0])) {  // Byte string like "5:hello"
-        auto extracted = extract_string(data);
-        std::string decoded_str = extracted.first;  // Extracted string part
-        std::string remaining_data = extracted.second;  // Remaining data after extraction
-        return {json(decoded_str), remaining_data};  // Return JSON string and remaining data
-    } else if (data[0] == 'i' && data[data.size() - 1] == 'e') {  // Integer like "i123e"
-        std::string int_str = data.substr(1, data.size() - 2);
-        return {json(std::atoll(int_str.c_str())), ""};  // Return JSON integer and empty string for remaining data
-    } else {
-        throw std::runtime_error("Unhandled bencoded value: " + data);
+    else
+    {
+        throw std::runtime_error("Invalid encoded value: " + encoded_string);
     }
 }
 
-// Main function that decodes the bencoded value
-json decode_bencoded_value(const std::string& encoded_value) {
-    auto result = decode(encoded_value);
-    json decoded_json = result.first;  // The decoded value in JSON format
-    std::string remaining_data = result.second;  // Remaining data after decoding (not used further in this case)
-    return decoded_json;
+json decode_bencoded_integer(const std::string &encoded_value, size_t &position)
+{
+    position++; // Skip 'i'
+    size_t end = encoded_value.find('e', position);
+    if (end == std::string::npos)
+    {
+        throw std::invalid_argument("Invalid bencoded integer");
+    }
+    std::string integer_str = encoded_value.substr(position, end - position);
+    position = end + 1; // Move past 'e'
+    return std::stoll(integer_str);
 }
 
-int main(int argc, char* argv[]) {
+json decode_bencoded_list(const std::string &encoded_value, size_t &position)
+{
+    position++; // Skip 'l'
+    json list = json::array();
+    while (encoded_value[position] != 'e')
+    {
+        list.push_back(decode_bencoded_value(encoded_value, position));
+    }
+    position++; // Skip 'e'
+    return list;
+}
+
+json decode_bencoded_value(const std::string &encoded_value, size_t &position)
+{
+    if (std::isdigit(encoded_value[position]))
+    {
+        return decode_bencoded_string(encoded_value, position);
+    }
+    else if (encoded_value[position] == 'i')
+    {
+        return decode_bencoded_integer(encoded_value, position);
+    }
+    else if (encoded_value[position] == 'l')
+    {
+        return decode_bencoded_list(encoded_value, position);
+    }
+    else
+    {
+        throw std::runtime_error("Unhandled encoded value: " + encoded_value);
+    }
+}
+
+json decode_bencoded_value(const std::string &encoded_value)
+{
+    size_t position = 0;
+    return decode_bencoded_value(encoded_value, position);
+}
+
+int main(int argc, char *argv[])
+{
     // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
 
-    if (argc < 2) {
+    if (argc < 2)
+    {
         std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
         return 1;
     }
 
     std::string command = argv[1];
 
-    if (command == "decode") {
-        if (argc < 3) {
+    if (command == "decode")
+    {
+        if (argc < 3)
+        {
             std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
             return 1;
         }
@@ -69,7 +109,9 @@ int main(int argc, char* argv[]) {
         std::string encoded_value = argv[2]; // this is the change
         json decoded_value = decode_bencoded_value(encoded_value);
         std::cout << decoded_value.dump() << std::endl;
-    } else {
+    }
+    else
+    {
         std::cerr << "unknown command: " << command << std::endl;
         return 1;
     }
