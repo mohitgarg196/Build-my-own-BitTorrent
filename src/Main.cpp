@@ -182,11 +182,14 @@ int main(int argc, char *argv[])
     {
         if (argc < 3)
         {
-            std::cerr << "Usage: " << argv[0] << " decode <encoded_value>" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " decode <encoded_value>"
+                      << std::endl;
             return 1;
         }
-        // You can use print statements as follows for debugging, they'll be visible when running tests.
+        // You can use print statements as follows for debugging, they'll be visible
+        // when running tests.
         // std::cout << "Logs from your program will appear here!" << std::endl;
+        // Uncomment this block to pass the first stage
         decode(argv[2]);
     }
     else if (command == "info")
