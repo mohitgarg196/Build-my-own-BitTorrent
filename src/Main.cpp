@@ -187,18 +187,17 @@ int main(int argc, char *argv[])
         }
         // You can use print statements as follows for debugging, they'll be visible when running tests.
         // std::cout << "Logs from your program will appear here!" << std::endl;
-        std::string encoded_value = argv[2];
-        json decoded_value = decode_bencoded_value(encoded_value);
-        std::cout << decoded_value.dump() << std::endl;
+        decode(argv[2]);
     }
     else if (command == "info")
     {
-        std::string filename = argv[2];
-        json decoded_data = parse_torrent_file(filename);
-        std::string tracker_url;
-        decoded_data["announce"].get_to(tracker_url);
-        std::cout << "Tracker URL: " << tracker_url << std::endl;
-        std::cout << "Length: " << decoded_data["info"]["length"] << std::endl;
+        if (argc < 3)
+        {
+            std::cerr << "Usage: " << argv[0] << " info <torrent_file>"
+                      << std::endl;
+            return 1;
+        }
+        info(argv[2]);
     }
     else
     {
