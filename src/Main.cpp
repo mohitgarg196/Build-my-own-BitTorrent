@@ -1,13 +1,11 @@
-#include <cctype>
-#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <tuple>
+#include <vector>
+#include <cctype>
+#include <cstdlib>
 #include "lib/nlohmann/json.hpp"
-
 using json = nlohmann::json;
-
 json decode_bencoded_value(std::string& encoded_value) {
     if (std::isdigit(encoded_value[0])) {
         // Example: "5:hello" -> "hello"
@@ -60,12 +58,9 @@ json decode_bencoded_value(std::string& encoded_value) {
     }
 }
 
-
-json parse_torrent_file(const std::string &filename)
-{
+json parse_torrent_file(const std::string& filename) {
     std::ifstream ifs(filename);
-    if (ifs)
-    {
+    if (ifs) {
         ifs.seekg(0, ifs.end);
         int length = ifs.tellg();
         ifs.seekg(0, ifs.beg);
@@ -76,6 +71,7 @@ json parse_torrent_file(const std::string &filename)
     }
     throw std::runtime_error("Unable to find file: " + filename);
 }
+
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
